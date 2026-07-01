@@ -83,11 +83,19 @@
     border-color:#E5A922; background:#fdf8ee;
     box-shadow:0 0 0 4px rgba(255,204,2,0.15);
   }
+  .field input.valid {
+    border-color:#43a047; background:#f3fbf4;
+  }
+  .field input.invalid {
+    border-color:#e53935; background:#fdf3f3;
+  }
   .field input.placa {
     text-transform:uppercase; font-weight:800;
     letter-spacing:4px; font-size:16px; color:#1a237e; text-align:center;
   }
   .field-icon { position:absolute; right:14px; bottom:13px; font-size:16px; pointer-events:none; opacity:0.4; }
+  .field-hint { font-size:10px; color:#b8b8b8; margin-top:4px; padding-left:4px; min-height:14px; }
+  .field-hint.error { color:#e53935; font-weight:600; }
   .form-row { display:flex; gap:10px; }
   .form-row .field { flex:1; }
 
@@ -206,31 +214,37 @@
           <label>Nombre</label>
           <input type="text" id="nombre" placeholder="Ej: María" required/>
           <span class="field-icon">👤</span>
+          <div class="field-hint" id="hint-nombre"></div>
         </div>
         <div class="field">
           <label>Apellido</label>
           <input type="text" id="apellido" placeholder="Ej: García" required/>
+          <div class="field-hint" id="hint-apellido"></div>
         </div>
       </div>
       <div class="field">
         <label>Placa del Vehículo</label>
         <input type="text" id="placa" placeholder="ABC-1234" maxlength="8" class="placa" required/>
         <span class="field-icon">🚘</span>
+        <div class="field-hint" id="hint-placa">Formato: 3 letras - 4 números, ej. ABC-1234</div>
       </div>
       <div class="field">
         <label>Cédula</label>
-        <input type="text" id="cedula" placeholder="0999999999" maxlength="10" required/>
+        <input type="text" id="cedula" placeholder="0999999999" maxlength="10" inputmode="numeric" required/>
         <span class="field-icon">🪪</span>
+        <div class="field-hint" id="hint-cedula"></div>
       </div>
       <div class="field">
         <label>Correo Electrónico</label>
         <input type="email" id="correo" placeholder="tucorreo@email.com" required/>
         <span class="field-icon">✉️</span>
+        <div class="field-hint" id="hint-correo"></div>
       </div>
       <div class="field">
         <label>Celular</label>
-        <input type="tel" id="celular" placeholder="0999999999" maxlength="10" required/>
+        <input type="tel" id="celular" placeholder="0999999999" maxlength="10" inputmode="numeric" required/>
         <span class="field-icon">📱</span>
+        <div class="field-hint" id="hint-celular"></div>
       </div>
 
       <button class="btn-enviar" id="btnEnviar" onclick="enviar()">
@@ -327,13 +341,165 @@
   // ════════════════════════════════════════════════════════
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwmlkOLHFCjeX0gqgkZyEuqJVa3AQ5mpUq7c2tcPfsVgkp7BqApa4kCCZYpJvgY8I4E/exec";
 
+  // ─── Auto-formateo de placa mientras se escribe: LLL-NNNN ───
+  document.getElementById('placa').addEventListener('input', function(e) {
+    let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7);
+    let letras = v.slice(0, 3).replace(/[^A-Z]/g, '');
+    let numeros = v.slice(3).replace(/[^0-9]/g, '').slice(0, 4);
+    e.target.value = numeros.length ? letras + '-' + numeros : letras;
+  });
+
+  // ─── Solo dígitos en cédula y celular ───
+  ['cedula','celular'].forEach(id => {
+    document.getElementById(id).addEventListener('input', function(e) {
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+    });
+  });
+
+  // ─── Solo letras y espacios en nombre/apellido ───
+  ['nombre','apellido'].forEach(id => {
+    document.getElementById(id).addEventListener('input', function(e) {
+      e.target.value = e.target.value.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s]/g, '');
+    });
+  });
+
+  // ════════════════════════════════════════════════════════
+  //  FUNCIONES DE VALIDACIÓN
+  // ════════════════════════════════════════════════════════
+
+  function validarNombre(valor) {
+    const v = valor.trim();
+    if (v.length < 2) return { ok:false, msg:'Debe tener al menos 2 caracteres.' };
+    if (v.length > 50) return { ok:false, msg:'Máximo 50 caracteres.' };
+    if (!/^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$/.test(v)) return { ok:false, msg:'Solo se permiten letras y espacios.' };
+    if (!/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(v)) return { ok:false, msg:'Ingresa un nombre válido.' };
+    return { ok:true };
+  }
+
+  // Placa ecuatoriana: 3 letras - 4 números (autos/camionetas). Ej: ABC-1234
+  function validarPlaca(valor) {
+    const v = valor.trim().toUpperCase();
+    if (!/^[A-Z]{3}-\d{4}$/.test(v)) {
+      return { ok:false, msg:'Formato inválido. Usa 3 letras y 4 números, ej. ABC-1234.' };
+    }
+    return { ok:true };
+  }
+
+  // Validación oficial de cédula ecuatoriana (dígito verificador módulo 10)
+  function validarCedulaEcuador(cedula) {
+    if (!/^\d{10}$/.test(cedula)) return { ok:false, msg:'La cédula debe tener 10 dígitos.' };
+    const provincia = parseInt(cedula.substring(0,2), 10);
+    if (provincia < 1 || provincia > 24) return { ok:false, msg:'Código de provincia inválido.' };
+    const tercerDigito = parseInt(cedula[2], 10);
+    if (tercerDigito > 6) return { ok:false, msg:'Número de cédula inválido.' };
+    const coeficientes = [2,1,2,1,2,1,2,1,2];
+    let suma = 0;
+    for (let i = 0; i < 9; i++) {
+      let valor = parseInt(cedula[i], 10) * coeficientes[i];
+      if (valor > 9) valor -= 9;
+      suma += valor;
+    }
+    const decena = Math.ceil(suma / 10) * 10;
+    const digitoVerificador = (decena - suma) === 10 ? 0 : (decena - suma);
+    if (digitoVerificador !== parseInt(cedula[9], 10)) {
+      return { ok:false, msg:'Cédula no válida (dígito verificador incorrecto).' };
+    }
+    return { ok:true };
+  }
+
+  function validarCorreo(valor) {
+    const v = valor.trim();
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!regex.test(v)) return { ok:false, msg:'Ingresa un correo electrónico válido.' };
+    return { ok:true };
+  }
+
+  function validarCelular(valor) {
+    if (!/^09\d{8}$/.test(valor)) {
+      return { ok:false, msg:'Debe tener 10 dígitos y empezar con 09.' };
+    }
+    return { ok:true };
+  }
+
+  const validadores = {
+    nombre: validarNombre,
+    apellido: validarNombre,
+    placa: validarPlaca,
+    cedula: validarCedulaEcuador,
+    correo: validarCorreo,
+    celular: validarCelular
+  };
+
+  function aplicarEstado(id, resultado) {
+    const input = document.getElementById(id);
+    const hint = document.getElementById('hint-' + id);
+    if (resultado.ok) {
+      input.classList.remove('invalid');
+      input.classList.add('valid');
+      hint.textContent = id === 'placa' ? 'Formato: 3 letras - 4 números, ej. ABC-1234' : '';
+      hint.classList.remove('error');
+    } else {
+      input.classList.remove('valid');
+      input.classList.add('invalid');
+      hint.textContent = resultado.msg;
+      hint.classList.add('error');
+    }
+    return resultado.ok;
+  }
+
+  // Validación en tiempo real al salir del campo (blur) y mientras escribe
+  Object.keys(validadores).forEach(id => {
+    const input = document.getElementById(id);
+    input.addEventListener('blur', function() {
+      if (input.value.trim() === '') return;
+      aplicarEstado(id, validadores[id](input.value));
+    });
+    input.addEventListener('input', function() {
+      if (input.classList.contains('invalid') || input.classList.contains('valid')) {
+        aplicarEstado(id, validadores[id](input.value));
+      }
+    });
+  });
+
+  function validarTodo() {
+    const campos = ['nombre','apellido','placa','cedula','correo','celular'];
+    let todoValido = true;
+    let primerErrorId = null;
+
+    for (const id of campos) {
+      const input = document.getElementById(id);
+      const valor = input.value.trim();
+
+      if (!valor) {
+        aplicarEstado(id, { ok:false, msg:'Este campo es obligatorio.' });
+        todoValido = false;
+        if (!primerErrorId) primerErrorId = id;
+        continue;
+      }
+
+      const resultado = validadores[id](valor);
+      if (!aplicarEstado(id, resultado)) {
+        todoValido = false;
+        if (!primerErrorId) primerErrorId = id;
+      }
+    }
+
+    if (primerErrorId) {
+      document.getElementById(primerErrorId).focus();
+    }
+
+    return todoValido;
+  }
+
   function enviar() {
+    if (!validarTodo()) {
+      return;
+    }
+
     const campos = ['nombre','apellido','placa','cedula','correo','celular'];
     const datos = {};
     for (const c of campos) {
-      const v = document.getElementById(c).value.trim();
-      if (!v) { alert('Por favor completa todos los campos.'); return; }
-      datos[c] = v;
+      datos[c] = document.getElementById(c).value.trim();
     }
 
     const btn = document.getElementById('btnEnviar');
