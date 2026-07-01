@@ -84,6 +84,7 @@
     box-shadow:0 0 0 4px rgba(255,204,2,0.15);
   }
   .field-icon { position:absolute; right:14px; bottom:13px; font-size:16px; pointer-events:none; opacity:0.4; }
+  .field-hint { font-size:10px; color:#b8b8b8; margin-top:4px; padding-left:4px; }
   .form-row { display:flex; gap:10px; }
   .form-row .field { flex:1; }
 
@@ -180,7 +181,7 @@
          alt="Seguro de Vida"/>
     <div class="hero-overlay"></div>
     <div class="hero-content">
-      <div class="hero-badge">❤️ Seguro de Vida</div>
+      <div class="hero-badge">👨‍👩‍👧 Seguro de Vida</div>
       <h1>Tu familia merece estar <span>protegida</span></h1>
       <p>Asegura el futuro de los tuyos con la mejor cobertura del mercado.</p>
     </div>
@@ -188,7 +189,7 @@
 
   <div class="col-form">
     <div class="form-header">
-      <div class="form-icon">❤️</div>
+      <div class="form-icon">👨‍👩‍👧</div>
       <h2>Solicita tu Cotización</h2>
       <p>Déjanos tus datos y nos comunicamos contigo<br/><strong>para resolver todas tus dudas.</strong></p>
     </div>
@@ -208,8 +209,10 @@
       </div>
       <div class="field">
         <label>Fecha de Nacimiento</label>
-        <input type="date" id="fechaNac" required/>
+        <input type="text" id="fechaNac" placeholder="DD/MM/AAAA" maxlength="10"
+               inputmode="numeric" pattern="\d{2}/\d{2}/\d{4}" required/>
         <span class="field-icon">🎂</span>
+        <div class="field-hint">Formato: día/mes/año, ej. 15/08/1995</div>
       </div>
       <div class="field">
         <label>Cédula</label>
@@ -321,6 +324,25 @@
   // ════════════════════════════════════════════════════════
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwmlkOLHFCjeX0gqgkZyEuqJVa3AQ5mpUq7c2tcPfsVgkp7BqApa4kCCZYpJvgY8I4E/exec";
 
+  // Auto-formatea la fecha mientras se escribe: DD/MM/AAAA
+  document.getElementById('fechaNac').addEventListener('input', function(e) {
+    let v = e.target.value.replace(/\D/g, '').slice(0, 8);
+    if (v.length >= 5) v = v.slice(0,2) + '/' + v.slice(2,4) + '/' + v.slice(4);
+    else if (v.length >= 3) v = v.slice(0,2) + '/' + v.slice(2);
+    e.target.value = v;
+  });
+
+  function fechaValida(str) {
+    const m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return false;
+    const dia = parseInt(m[1],10), mes = parseInt(m[2],10), anio = parseInt(m[3],10);
+    if (mes < 1 || mes > 12) return false;
+    const diasEnMes = new Date(anio, mes, 0).getDate();
+    if (dia < 1 || dia > diasEnMes) return false;
+    if (anio < 1900 || anio > new Date().getFullYear()) return false;
+    return true;
+  }
+
   function enviar() {
     const campos = ['nombres','apellidos','fechaNac','cedula','correo','celular'];
     const datos = {};
@@ -328,6 +350,11 @@
       const v = document.getElementById(c).value.trim();
       if (!v) { alert('Por favor completa todos los campos.'); return; }
       datos[c] = v;
+    }
+
+    if (!fechaValida(datos.fechaNac)) {
+      alert('Ingresa una fecha de nacimiento válida en formato DD/MM/AAAA.');
+      return;
     }
 
     const btn = document.getElementById('btnEnviar');
